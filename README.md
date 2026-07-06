@@ -1,35 +1,58 @@
 # multimodal-bridge
 
-Claude Code MCP Server — 为 Claude Code 提供**视觉理解** (Qwen-VL) 和**图像生成** (通义万相) 能力。
+**省钱个人工作流** — Claude Code + DeepSeek API + Qwen Vision 三件套。
 
-## 功能
+## 动机
 
-| 工具 | 能力 | 底层模型 |
-|------|------|----------|
-| `qwen_vision` | 本地图片理解（描述、OCR、分析） | Qwen-VL-Max / Qwen3-VL |
-| `qwen_generate` | 文生图（中文/英文 prompt） | 通义万相 Wanx2.1 |
+Claude Code 很强，但 Anthropic API 太贵。把能省的都省了：
 
-## 安装
+| 能力 | 用谁 | 为什么 |
+|------|------|--------|
+| **Coding Agent** | Claude Code | 交互体验无可替代 |
+| **LLM 推理** | DeepSeek API (`deepseek-v4-pro`) | 代码能力不输，价格砍一个数量级 |
+| **视觉理解** | Qwen-VL（百炼免费额度） | Claude Vision 太贵，Qwen 90 天免费 |
+| **图像生成** | 通义万相（百炼免费额度） | 偶尔需要，没必要付费用 DALL·E |
 
-```bash
-pip install -r requirements.txt
+`multimodal-bridge` 就是那个视觉和图像的 MCP 桥——Claude Code 本身只有纯文本推理，遇到图片就通过这个 bridge 调 Qwen。
+
+## 工作流架构
+
+```
+┌──────────────┐     ┌─────────────────┐     ┌──────────────────┐
+│  Claude Code │────▶│  DeepSeek API   │────▶│  代码生成/重构    │
+│  (前端/IDE)   │     │  (deepseek-v4)  │     │  (纯文本, 便宜)   │
+└──────┬───────┘     └─────────────────┘     └──────────────────┘
+       │
+       │ 遇到图片? ──▶ multimodal-bridge (MCP)
+       │                    │
+       │              ┌─────┴─────┐
+       │              │           │
+       │         Qwen-VL    通义万相
+       │        (图片理解)   (图片生成)
+       │              │           │
+       │        百炼免费额度   百炼免费额度
+       │        (90天新用户)   (90天新用户)
 ```
 
-### 前置条件
+## 我的 settings.json
 
-- Python 3.10+
-- 阿里云百炼 API Key（[免费注册](https://bailian.console.aliyun.com)，新用户 90 天免费额度）
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_MODEL": "deepseek-v4-pro"
+  },
+  "enabledMcpjsonServers": ["multimodal-bridge"]
+}
+```
 
-## Claude Code 集成
-
-在 `~/.claude/settings.json`（全局）或 `<project>/.claude/settings.json`（项目级）中添加：
-
+`.claude/mcp.json`:
 ```json
 {
   "mcpServers": {
     "multimodal-bridge": {
       "command": "python",
-      "args": ["<path-to-repo>/server.py"],
+      "args": ["C:/WorkSpace/multimodal-bridge/server.py"],
       "env": {
         "QWEN_DASHSCOPE_API_KEY": "sk-xxxxxxxx"
       }
@@ -38,47 +61,56 @@ pip install -r requirements.txt
 }
 ```
 
-## 配置
+核心技巧：`ANTHROPIC_BASE_URL` 指向 DeepSeek 的 Anthropic 兼容端点，Claude Code 的 tool use/agent/memory 全套功能照样跑，但每个 token 便宜 10 倍。
 
-所有配置通过环境变量控制：
+## 安装
+
+```bash
+git clone https://github.com/Spirit4471/multimodal-bridge.git
+cd multimodal-bridge
+pip install -r requirements.txt
+```
+
+前置条件：
+- Python 3.10+
+- [百炼 API Key](https://bailian.console.aliyun.com)（新用户 90 天免费，100万 Token + 500张图）
+- [DeepSeek API Key](https://platform.deepseek.com)（如果也要用 DeepSeek 后端）
+
+## MCP 工具
+
+| 工具 | 功能 | 模型 |
+|------|------|------|
+| `qwen_vision(image_path, prompt)` | 图片理解、OCR、分析 | qwen-vl-max / qwen3-vl-flash |
+| `qwen_generate(prompt, size)` | 文生图 | wanx2.1-t2i-turbo |
+
+## 费用对比
+
+| | Anthropic 官方 | 本工作流 | 省多少 |
+|---|---|---|---|
+| LLM (1M tokens) | ~$15 (Sonnet) | ~$0.48 (DeepSeek v4) | **97%** ↓ |
+| Vision (100张图) | ~$3-5 | ¥0 (百炼免费) | **100%** ↓ (前90天) |
+| 图像生成 (100张) | ~$4-8 (DALL·E) | ¥0 (百炼免费) | **100%** ↓ (前90天) |
+
+## 配置
 
 | 环境变量 | 说明 | 默认值 |
 |----------|------|--------|
-| `QWEN_DASHSCOPE_API_KEY` | 百炼 API Key（VISION/GENERATE 均回退到此） | — |
-| `VISION_BACKEND` | 视觉理解后端 | `qwen_dashscope` |
+| `QWEN_DASHSCOPE_API_KEY` | 百炼 Key | — |
 | `VISION_MODEL` | 视觉模型 | `qwen-vl-max` |
-| `VISION_API_KEY` | 视觉专用 Key（可选） | `QWEN_DASHSCOPE_API_KEY` |
-| `GENERATE_BACKEND` | 图像生成后端 | `qwen_dashscope` |
 | `GENERATE_MODEL` | 生成模型 | `wanx2.1-t2i-turbo` |
-| `GENERATE_API_KEY` | 生成专用 Key（可选） | `QWEN_DASHSCOPE_API_KEY` |
-| `QWEN_API_BASE` | 自定义 API 端点 | `https://dashscope.aliyuncs.com` |
-| `OUTPUT_DIR` | 图片保存目录 | `./generated/` |
+| `QWEN_API_BASE` | 自定义端点 | `dashscope.aliyuncs.com` |
 
-## 支持的模型
+## 扩展
 
-### Vision
-- `qwen-vl-max` — 最强精度
-- `qwen-vl-plus` — 均衡
-- `qwen3-vl-flash` — 性价比首选
-- `qwen3-vl-plus` — 新一代
-
-### Generate
-- `wanx2.1-t2i-turbo` — 性价比首选 (¥0.14/张)
-- `wan2.2-t2i-plus` — 高质量
-- `qwen-image-2.0` — 新一代
-- `qwen-image-max` — 最强
-
-## 架构
+适配器模式 — 在 `adapters/` 下新增 `.py`，实现 `vision()` / `generate()` 即可接入其他视觉后端：
 
 ```
-server.py          # MCP Server 入口，注册工具 + 路由
-config.py          # 环境变量 → 配置映射
+server.py
+config.py
 adapters/
-├── __init__.py    # 适配器接口约定
-└── qwen_dashscope.py  # Qwen DashScope 适配器（Vision + Generate）
+├── __init__.py          # 接口约定
+└── qwen_dashscope.py    # 当前适配器
 ```
-
-适配器模式支持扩展其他后端（只需在 `adapters/` 下新增 `.py` 并实现 `vision()` / `generate()` 即可）。
 
 ## License
 
