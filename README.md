@@ -1,6 +1,6 @@
 # multimodal-bridge
 
-**省钱个人工作流** — Claude Code + DeepSeek API + Qwen Vision 三件套。
+**省钱个人工作流** — Claude Code + DeepSeek API + Qwen 系列多模态模型。
 
 ## 动机
 
@@ -10,10 +10,12 @@ Claude Code 很强，但 Anthropic API 太贵。把能省的都省了：
 |------|------|--------|
 | **Coding Agent** | Claude Code | 交互体验无可替代 |
 | **LLM 推理** | DeepSeek API (`deepseek-v4-pro`) | 代码能力不输，价格砍一个数量级 |
-| **视觉理解** | Qwen-VL（百炼免费额度） | Claude Vision 太贵，Qwen 90 天免费 |
-| **图像生成** | 通义万相（百炼免费额度） | 偶尔需要，没必要付费用 DALL·E |
+| **视觉理解** | Qwen-VL 系列（百炼免费额度） | Claude Vision 太贵，Qwen 90 天免费 |
+| **图像生成** | Qwen-Image 系列（百炼免费额度） | 偶尔需要，没必要付费用 DALL·E |
 
-`multimodal-bridge` 就是那个视觉和图像的 MCP 桥——Claude Code 本身只有纯文本推理，遇到图片就通过这个 bridge 调 Qwen。
+> 视觉理解和图像生成都是 **Qwen 系列模型**，统一走百炼 API，共享同一套免费额度体系。
+
+`multimodal-bridge` 就是那个多模态 MCP 桥——Claude Code 本身只有纯文本推理，遇到图片/生成需求就通过这个 bridge 调 Qwen。
 
 ## 工作流架构
 
@@ -27,7 +29,7 @@ Claude Code 很强，但 Anthropic API 太贵。把能省的都省了：
        │                    │
        │              ┌─────┴─────┐
        │              │           │
-       │         Qwen-VL    通义万相
+       │         Qwen-VL    Qwen-Image
        │        (图片理解)   (图片生成)
        │              │           │
        │        百炼免费额度   百炼免费额度
@@ -80,8 +82,8 @@ pip install -r requirements.txt
 
 | 工具 | 功能 | 模型 |
 |------|------|------|
-| `qwen_vision(image_path, prompt)` | 图片理解、OCR、分析 | qwen-vl-max / qwen3-vl-flash |
-| `qwen_generate(prompt, size)` | 文生图 | wanx2.1-t2i-turbo |
+| `qwen_vision(image_path, prompt)` | 图片理解、OCR、分析 | Qwen-VL 系列 (qwen-vl-max / qwen3-vl-flash) |
+| `qwen_generate(prompt, size)` | 文生图 | Qwen-Image 系列 (qwen-image-2.0 / wanx2.1-t2i-turbo) |
 
 ## 费用对比
 

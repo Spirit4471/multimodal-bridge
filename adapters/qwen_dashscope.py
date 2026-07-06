@@ -1,5 +1,5 @@
 """
-Qwen DashScope 适配器 — Vision (Qwen-VL) + Generate (通义万相)
+Qwen DashScope 适配器 — Vision (Qwen-VL) + Generate (Qwen-Image)
 
 支持两种 API 模式:
   1. DashScope 原生 API (默认 dashscope.aliyuncs.com)

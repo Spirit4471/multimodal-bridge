@@ -3,7 +3,7 @@
 multimodal-bridge MCP Server
 ============================
 
-为 Claude Code 提供视觉理解 (Vision) 和图像生成 (Generate) 能力。
+为 Claude Code 提供视觉理解 (Qwen-VL) 和图像生成 (Qwen-Image) 能力，均使用 Qwen 系列模型。
 
 注册到 ~/.claude/settings.json (全局) 或 <project>/.claude/settings.json (项目级):
   {
@@ -82,7 +82,7 @@ async def handle_list_tools() -> list[Tool]:
         Tool(
             name="qwen_generate",
             description=(
-                "调用图像生成模型创建图片。支持中文/英文提示词。\n"
+                "调用 Qwen-Image 系列图像生成模型创建图片。支持中文/英文提示词。\n"
                 "适用场景: 生成概念图、插图、设计稿、参考图等。\n"
                 "参数:\n"
                 "  prompt: 图像描述 (中文效果更好)\n"
