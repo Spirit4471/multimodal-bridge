@@ -31,16 +31,18 @@ def _use_openai_compat() -> bool:
     return "compatible-mode" in QWEN_API_BASE or "maas.aliyuncs.com" in QWEN_API_BASE
 
 # 端点
+_BASE = QWEN_API_BASE.rstrip("/")
+
 if _use_openai_compat():
     # 百炼 OpenAI 兼容端点: https://xxx.maas.aliyuncs.com/compatible-mode/v1
-    _VISION_EP = f"{QWEN_API_BASE}/chat/completions"
-    _GENERATE_EP = f"{QWEN_API_BASE}/images/generations"
+    _VISION_EP = f"{_BASE}/chat/completions"
+    _GENERATE_EP = f"{_BASE}/images/generations"
     _GENERATE_RESULT_EP = f"{QWEN_API_BASE.rstrip('/v1').rsplit('/', 2)[0]}/tasks"  # 回退到 base domain
 else:
-    # DashScope 原生端点
-    _VISION_EP = f"{QWEN_API_BASE}/services/aigc/multimodal-generation/generation"
-    _GENERATE_EP = f"{QWEN_API_BASE}/services/aigc/text2image/image-synthesis"
-    _GENERATE_RESULT_EP = f"{QWEN_API_BASE.rstrip('/api/v1')}/tasks"
+    # DashScope 原生端点 (base 如 https://dashscope.aliyuncs.com)
+    _VISION_EP = f"{_BASE}/api/v1/services/aigc/multimodal-generation/generation"
+    _GENERATE_EP = f"{_BASE}/api/v1/services/aigc/text2image/image-synthesis"
+    _GENERATE_RESULT_EP = f"{_BASE}/api/v1/tasks"
 
 # 支持的模型列表（均来自百炼定价表，新用户 90 天免费额度）
 _VISION_MODELS = {
