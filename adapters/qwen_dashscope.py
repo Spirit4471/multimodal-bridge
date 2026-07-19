@@ -151,7 +151,7 @@ async def vision(image_path: str, prompt: str,
                     ],
                 }
             ],
-            "max_tokens": 1000,
+            "max_tokens": 4096,
         }
     else:
         # DashScope 原生格式
