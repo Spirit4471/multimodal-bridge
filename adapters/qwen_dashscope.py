@@ -19,6 +19,7 @@ Qwen DashScope 适配器 — Vision (Qwen-VL) + Generate (Qwen-Image)
 
 import base64
 import json
+import re
 import time
 from pathlib import Path
 
@@ -35,8 +36,9 @@ _BASE = QWEN_API_BASE.rstrip("/")
 
 if _use_openai_compat():
     # 百炼 OpenAI 兼容端点: https://xxx.maas.aliyuncs.com/compatible-mode/v1
+    # 该模式下视觉理解与图像生成都走 chat/completions
     _VISION_EP = f"{_BASE}/chat/completions"
-    _GENERATE_EP = f"{_BASE}/images/generations"
+    _GENERATE_EP = f"{_BASE}/chat/completions"
 else:
     # DashScope 原生端点 (base 如 https://dashscope.aliyuncs.com)
     _VISION_EP = f"{_BASE}/api/v1/services/aigc/multimodal-generation/generation"
@@ -159,18 +161,26 @@ async def vision(image_path: str, prompt: str,
 async def _generate_via_openai_compat(prompt: str, size: str, model: str,
                                       api_key: str, n: int,
                                       negative_prompt: str) -> tuple[list[tuple[str, str]], str]:
-    """百炼 OpenAI 兼容模式: POST /images/generations, 同步返回图片。
+    """百炼 OpenAI 兼容模式: 图像生成走 chat/completions, 同步返回。
+
+    实测该网关不提供 /images/generations；图像模型 (qwen-image 等) 挂在
+    chat/completions 下——请求为 OpenAI chat 格式 (content 为 list)，
+    size / n / negative_prompt 通过 DashScope 风格的 parameters 传入；
+    响应为 DashScope 原生风格:
+      output.choices[0].message.content = [{"image": url}, ...]
+    解析时同时兼容标准 OpenAI images (data[].url/b64_json) 与
+    chat 文本中内嵌图片 URL 的响应形状。
 
     返回 ([(kind, value)], stem): kind 为 "url" 或 "b64", stem 用于文件命名。
     """
     body = {
         "model": model,
-        "prompt": prompt,
-        "size": size,
-        "n": min(n, 4),
+        "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+        "parameters": {"size": size, "n": min(n, 4)},
+        "stream": False,
     }
     if negative_prompt:
-        body["negative_prompt"] = negative_prompt
+        body["parameters"]["negative_prompt"] = negative_prompt
 
     async with httpx.AsyncClient(timeout=180) as client:
         resp = await client.post(
@@ -182,12 +192,32 @@ async def _generate_via_openai_compat(prompt: str, size: str, model: str,
         resp.raise_for_status()
         result = resp.json()
 
-    items = []
-    for entry in result.get("data", []):
-        if entry.get("url"):
-            items.append(("url", entry["url"]))
-        elif entry.get("b64_json"):
-            items.append(("b64", entry["b64_json"]))
+    items: list[tuple[str, str]] = []
+
+    # DashScope 原生风格: output.choices[].message.content = [{"image": url}, ...]
+    for choice in result.get("output", {}).get("choices", []):
+        content = choice.get("message", {}).get("content")
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("image"):
+                    items.append(("url", part["image"]))
+
+    # 标准 OpenAI images 风格: data[].url / data[].b64_json
+    if not items:
+        for entry in result.get("data", []):
+            if entry.get("url"):
+                items.append(("url", entry["url"]))
+            elif entry.get("b64_json"):
+                items.append(("b64", entry["b64_json"]))
+
+    # 标准 OpenAI chat 风格: choices[].message.content 文本内嵌图片 URL
+    if not items:
+        for choice in result.get("choices", []):
+            content = choice.get("message", {}).get("content")
+            if isinstance(content, str):
+                for url in re.findall(r"https?://\S+", content):
+                    items.append(("url", url.rstrip(").]\"'")))
+
     if not items:
         raise RuntimeError(f"生成接口未返回图片: {json.dumps(result, ensure_ascii=False)}")
     return items, str(int(time.time()))
