@@ -28,7 +28,7 @@ VISION_MODEL = os.getenv("VISION_MODEL", "qwen-vl-max")
 # ── 图像生成后端 ──────────────────────────────────────────
 GENERATE_BACKEND = os.getenv("GENERATE_BACKEND", "qwen_dashscope")
 GENERATE_API_KEY = os.getenv("GENERATE_API_KEY") or QWEN_API_KEY
-GENERATE_MODEL = os.getenv("GENERATE_MODEL", "wanx2.1-t2i-turbo")
+GENERATE_MODEL = os.getenv("GENERATE_MODEL", "qwen-image-2.0")
 
 # ── 图片下载目录 (可选，默认为本包下的 generated/) ─────
 # 不能用 os.getcwd()：stdio MCP 服务器的 cwd 取决于宿主从哪启动，落点不可预测。

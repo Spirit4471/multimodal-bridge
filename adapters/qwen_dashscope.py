@@ -55,10 +55,16 @@ _VISION_MODELS = {
 }
 
 _GENERATE_MODELS = {
+    # 官方 DashScope / 百炼 (注释为官方刊例价)
     "wanx2.1-t2i-turbo",  # ¥0.14/张, 500张免费 (性价比首选)
     "wan2.2-t2i-plus",    # ¥0.20/张, 100张免费
     "qwen-image-2.0",     # ¥0.20/张, 100张免费
+    "qwen-image-2.0-pro",
     "qwen-image-max",     # ¥0.50/张, 100张免费
+    "qwen-image-plus",
+    # 百炼工作空间网关实测可用
+    "wan2.7-image",
+    "wan2.7-image-pro",
 }
 
 
@@ -341,7 +347,7 @@ async def _save_images(items: list[tuple[str, str]], dest_dir, stem: str) -> lis
 
 
 async def generate(prompt: str, size: str = "1024*1024",
-                   model: str = "wan2.1-t2i-turbo",
+                   model: str = "qwen-image-2.0",
                    api_key: str = "",
                    n: int = 1,
                    negative_prompt: str = "",
@@ -352,7 +358,7 @@ async def generate(prompt: str, size: str = "1024*1024",
     参数:
       prompt:          正向提示词 (中文/英文均可，中文理解好)
       size:            图像尺寸 "1024*1024" / "720*1280" / "1280*720"
-      model:           wanx2.1-t2i-turbo (默认)
+      model:           qwen-image-2.0 (默认)
       api_key:         DashScope API Key
       n:              生成数量 (1-4)
       negative_prompt: 反向提示词 (可选)
