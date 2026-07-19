@@ -30,7 +30,6 @@ GENERATE_BACKEND = os.getenv("GENERATE_BACKEND", "qwen_dashscope")
 GENERATE_API_KEY = os.getenv("GENERATE_API_KEY") or QWEN_API_KEY
 GENERATE_MODEL = os.getenv("GENERATE_MODEL", "wanx2.1-t2i-turbo")
 
-# ── 图片下载目录 (可选，默认当前目录下的 generated/) ─────
-OUTPUT_DIR = os.getenv("OUTPUT_DIR", os.path.join(os.getcwd(), "generated"))
-
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# ── 图片下载目录 (可选，默认为本包下的 generated/) ─────
+# 不能用 os.getcwd()：stdio MCP 服务器的 cwd 取决于宿主从哪启动，落点不可预测。
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated"))
