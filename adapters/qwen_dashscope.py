@@ -17,6 +17,7 @@ Qwen DashScope 适配器 — Vision (Qwen-VL) + Generate (Qwen-Image)
   百炼兼容:  https://help.aliyun.com/zh/model-studio/developer-reference/compatible-mode
 """
 
+import asyncio
 import base64
 import json
 import re
@@ -261,7 +262,7 @@ async def _generate_via_dashscope(prompt: str, size: str, model: str,
 
     async with httpx.AsyncClient(timeout=30) as client:
         while elapsed < max_wait:
-            time.sleep(interval)
+            await asyncio.sleep(interval)
             elapsed += interval
 
             resp = await client.get(
