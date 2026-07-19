@@ -123,22 +123,19 @@ async def handle_list_tools() -> list[Tool]:
 async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
     if name == "qwen_vision":
         return await _handle_vision(arguments)
-    elif name == "qwen_generate":
+    if name == "qwen_generate":
         return await _handle_generate(arguments)
-    else:
-        return [TextContent(type="text", text=f"未知工具: {name}")]
+    raise ValueError(f"未知工具: {name}")
 
 
 # ── Vision 处理 ──────────────────────────────────────────
 async def _handle_vision(args: dict) -> list[TextContent]:
+    """失败时抛出异常，由 MCP SDK 以 isError=True 返回调用方。"""
     image_path = args.get("image_path", "")
     prompt = args.get("prompt", "")
 
     if not image_path or not prompt:
-        return [TextContent(
-            type="text",
-            text="[错误] 缺少必要参数: image_path 和 prompt 均为必填",
-        )]
+        raise ValueError("缺少必要参数: image_path 和 prompt 均为必填")
 
     adapter = _load_adapter(config.VISION_BACKEND)
 
@@ -149,24 +146,23 @@ async def _handle_vision(args: dict) -> list[TextContent]:
             model=config.VISION_MODEL,
             api_key=config.VISION_API_KEY,
         )
-        return [TextContent(type="text", text=result)]
-    except FileNotFoundError as e:
-        return [TextContent(type="text", text=f"[文件不存在] {e}")]
-    except ValueError as e:
-        return [TextContent(type="text", text=f"[配置错误] {e}")]
+    except (FileNotFoundError, ValueError):
+        raise
     except Exception as e:
-        return [TextContent(type="text", text=f"[视觉理解失败] {type(e).__name__}: {e}")]
+        raise RuntimeError(f"[视觉理解失败] {type(e).__name__}: {e}") from e
+    return [TextContent(type="text", text=result)]
 
 
 # ── Generate 处理 ────────────────────────────────────────
 async def _handle_generate(args: dict) -> list[TextContent]:
+    """失败时抛出异常，由 MCP SDK 以 isError=True 返回调用方。"""
     prompt = args.get("prompt", "")
     size = args.get("size", "1024*1024")
     n_val = args.get("n", 1)
     negative_prompt = args.get("negative_prompt", "")
 
     if not prompt:
-        return [TextContent(type="text", text="[错误] 缺少必要参数: prompt")]
+        raise ValueError("缺少必要参数: prompt")
 
     adapter = _load_adapter(config.GENERATE_BACKEND)
 
@@ -180,20 +176,14 @@ async def _handle_generate(args: dict) -> list[TextContent]:
             negative_prompt=negative_prompt,
             output_dir=config.OUTPUT_DIR,
         )
-        return [TextContent(
-            type="text",
-            text=json.dumps(result, ensure_ascii=False, indent=2),
-        )]
-    except ValueError as e:
-        return [TextContent(
-            type="text",
-            text=json.dumps({"success": False, "images": [], "error": str(e)}, ensure_ascii=False),
-        )]
+    except ValueError:
+        raise
     except Exception as e:
-        return [TextContent(
-            type="text",
-            text=json.dumps({"success": False, "images": [], "error": f"{type(e).__name__}: {e}"}, ensure_ascii=False),
-        )]
+        raise RuntimeError(f"[图像生成失败] {type(e).__name__}: {e}") from e
+    return [TextContent(
+        type="text",
+        text=json.dumps(result, ensure_ascii=False, indent=2),
+    )]
 
 
 # ── 入口 ─────────────────────────────────────────────────
