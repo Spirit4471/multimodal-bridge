@@ -62,8 +62,13 @@ _GENERATE_MODELS = {
 }
 
 
+# 单图上限：超过才压缩。VL API 对请求体体积和像素尺寸都有限制。
+_MAX_IMAGE_EDGE = 1568
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+
 def _image_to_base64(image_path: str) -> str:
-    """将本地图片编码为 base64 data URI (JPEG/PNG/WebP)"""
+    """将本地图片编码为 base64 data URI；超限图片自动缩小/压缩为 JPEG。"""
     path = Path(image_path)
     if not path.exists():
         raise FileNotFoundError(f"图片不存在: {image_path}")
@@ -75,8 +80,38 @@ def _image_to_base64(image_path: str) -> str:
     mime = mime_map.get(suffix, "image/jpeg")
 
     data = path.read_bytes()
-    b64 = base64.b64encode(data).decode("ascii")
-    return f"data:{mime};base64,{b64}"
+    try:
+        from PIL import Image
+        import io
+
+        with Image.open(path) as img:
+            width, height = img.size
+            if len(data) <= _MAX_IMAGE_BYTES and max(width, height) <= _MAX_IMAGE_EDGE:
+                b64 = base64.b64encode(data).decode("ascii")
+                return f"data:{mime};base64,{b64}"
+
+            # 透明通道合成到白底，避免转 JPEG 后变黑
+            if img.mode in ("RGBA", "LA", "P"):
+                rgba = img.convert("RGBA")
+                background = Image.new("RGB", rgba.size, (255, 255, 255))
+                background.paste(rgba, mask=rgba.split()[-1])
+                img = background
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            img.thumbnail((_MAX_IMAGE_EDGE, _MAX_IMAGE_EDGE))
+            encoded = b""
+            for quality in (85, 70, 50):
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=quality)
+                encoded = buf.getvalue()
+                if len(encoded) <= _MAX_IMAGE_BYTES:
+                    break
+        return f"data:image/jpeg;base64,{base64.b64encode(encoded).decode('ascii')}"
+    except (ImportError, OSError):
+        # 无 Pillow 或图片无法解析时原样编码，交由 API 侧报错
+        b64 = base64.b64encode(data).decode("ascii")
+        return f"data:{mime};base64,{b64}"
 
 
 async def vision(image_path: str, prompt: str,
