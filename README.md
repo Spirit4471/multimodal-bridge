@@ -48,7 +48,7 @@ Claude Code 很强，但 Anthropic API 太贵。把能省的都省了：
 }
 ```
 
-`.claude/mcp.json`:
+`.mcp.json`（项目根目录）:
 ```json
 {
   "mcpServers": {
@@ -83,7 +83,7 @@ pip install -r requirements.txt
 | 工具 | 功能 | 模型 |
 |------|------|------|
 | `qwen_vision(image_path, prompt)` | 图片理解、OCR、分析 | Qwen-VL 系列 (qwen-vl-max / qwen3-vl-flash) |
-| `qwen_generate(prompt, size)` | 文生图 | Qwen-Image 系列 (qwen-image-2.0 / wanx2.1-t2i-turbo) |
+| `qwen_generate(prompt, size)` | 文生图 | Qwen-Image 系列 (qwen-image-2.0 / qwen-image-2.0-pro / wan2.7-image) |
 
 ## 费用对比
 
@@ -99,8 +99,9 @@ pip install -r requirements.txt
 |----------|------|--------|
 | `QWEN_DASHSCOPE_API_KEY` | 百炼 Key | — |
 | `VISION_MODEL` | 视觉模型 | `qwen-vl-max` |
-| `GENERATE_MODEL` | 生成模型 | `wanx2.1-t2i-turbo` |
-| `QWEN_API_BASE` | 自定义端点 | `dashscope.aliyuncs.com` |
+| `GENERATE_MODEL` | 生成模型 | `qwen-image-2.0` |
+| `QWEN_API_BASE` | 自定义端点（百炼工作空间填网关地址） | `https://dashscope.aliyuncs.com` |
+| `OUTPUT_DIR` | 生成图片保存目录 | 包目录下的 `generated/` |
 
 ## 扩展
 

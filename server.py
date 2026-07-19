@@ -5,18 +5,20 @@ multimodal-bridge MCP Server
 
 为 Claude Code 提供视觉理解 (Qwen-VL) 和图像生成 (Qwen-Image) 能力，均使用 Qwen 系列模型。
 
-注册到 ~/.claude/settings.json (全局) 或 <project>/.claude/settings.json (项目级):
+注册到项目根目录的 .mcp.json (Claude Code / Kimi Code 等宿主均会读取):
   {
     "mcpServers": {
       "multimodal-bridge": {
         "command": "python",
         "args": ["C:/WorkSpace/multimodal-bridge/server.py"],
         "env": {
-          "QWEN_DASHSCOPE_API_KEY": "sk-xxxxxxxx"
+          "QWEN_DASHSCOPE_API_KEY": "sk-xxxxxxxx",
+          "QWEN_API_BASE": "https://dashscope.aliyuncs.com"
         }
       }
     }
   }
+QWEN_API_BASE 可省略 (默认官方 DashScope)；百炼工作空间填网关地址。
 
 MCP 工具:
   qwen_vision(image_path, prompt)  → 图片理解
