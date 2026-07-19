@@ -37,7 +37,6 @@ if _use_openai_compat():
     # 百炼 OpenAI 兼容端点: https://xxx.maas.aliyuncs.com/compatible-mode/v1
     _VISION_EP = f"{_BASE}/chat/completions"
     _GENERATE_EP = f"{_BASE}/images/generations"
-    _GENERATE_RESULT_EP = f"{QWEN_API_BASE.rstrip('/v1').rsplit('/', 2)[0]}/tasks"  # 回退到 base domain
 else:
     # DashScope 原生端点 (base 如 https://dashscope.aliyuncs.com)
     _VISION_EP = f"{_BASE}/api/v1/services/aigc/multimodal-generation/generation"
@@ -157,34 +156,47 @@ async def vision(image_path: str, prompt: str,
         return json.dumps(result, ensure_ascii=False, indent=2)
 
 
-async def generate(prompt: str, size: str = "1024*1024",
-                   model: str = "wan2.1-t2i-turbo",
-                   api_key: str = "",
-                   n: int = 1,
-                   negative_prompt: str = "",
-                   output_dir: str = "") -> dict:
+async def _generate_via_openai_compat(prompt: str, size: str, model: str,
+                                      api_key: str, n: int,
+                                      negative_prompt: str) -> tuple[list[tuple[str, str]], str]:
+    """百炼 OpenAI 兼容模式: POST /images/generations, 同步返回图片。
+
+    返回 ([(kind, value)], stem): kind 为 "url" 或 "b64", stem 用于文件命名。
     """
-    调用通义万相生成图像。
+    body = {
+        "model": model,
+        "prompt": prompt,
+        "size": size,
+        "n": min(n, 4),
+    }
+    if negative_prompt:
+        body["negative_prompt"] = negative_prompt
 
-    参数:
-      prompt:          正向提示词 (中文/英文均可，中文理解好)
-      size:            图像尺寸 "1024*1024" / "720*1280" / "1280*720"
-      model:           wan2.1-t2i-turbo (默认)
-      api_key:         DashScope API Key
-      n:              生成数量 (1-4)
-      negative_prompt: 反向提示词 (可选)
-      output_dir:      图片保存目录 (可选)
+    async with httpx.AsyncClient(timeout=180) as client:
+        resp = await client.post(
+            _GENERATE_EP,
+            json=body,
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"},
+        )
+        resp.raise_for_status()
+        result = resp.json()
 
-    返回:
-      {"success": bool, "images": [本地路径...], "error": str | None}
-    """
-    if not api_key:
-        raise ValueError("缺少 DashScope API Key (设置 GENERATE_API_KEY 或 QWEN_DASHSCOPE_API_KEY)")
+    items = []
+    for entry in result.get("data", []):
+        if entry.get("url"):
+            items.append(("url", entry["url"]))
+        elif entry.get("b64_json"):
+            items.append(("b64", entry["b64_json"]))
+    if not items:
+        raise RuntimeError(f"生成接口未返回图片: {json.dumps(result, ensure_ascii=False)}")
+    return items, str(int(time.time()))
 
-    if model not in _GENERATE_MODELS:
-        raise ValueError(f"不支持的生成模型: {model}，可选: {_GENERATE_MODELS}")
 
-    # 1. 提交生成任务
+async def _generate_via_dashscope(prompt: str, size: str, model: str,
+                                  api_key: str, n: int,
+                                  negative_prompt: str) -> tuple[list[tuple[str, str]], str]:
+    """DashScope 原生模式: 异步任务, 提交后轮询拿图片 URL。"""
     body = {
         "model": model,
         "input": {"prompt": prompt},
@@ -196,6 +208,7 @@ async def generate(prompt: str, size: str = "1024*1024",
     if negative_prompt:
         body["parameters"]["negative_prompt"] = negative_prompt
 
+    # 1. 提交生成任务
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
             _GENERATE_EP,
@@ -209,7 +222,7 @@ async def generate(prompt: str, size: str = "1024*1024",
 
     task_id = submit_result.get("output", {}).get("task_id")
     if not task_id:
-        return {"success": False, "images": [], "error": f"提交任务失败: {json.dumps(submit_result, ensure_ascii=False)}"}
+        raise RuntimeError(f"提交任务失败: {json.dumps(submit_result, ensure_ascii=False)}")
 
     # 2. 轮询任务结果 (最多等 2 分钟)
     poll_url = f"{_GENERATE_RESULT_EP}/{task_id}"
@@ -232,32 +245,71 @@ async def generate(prompt: str, size: str = "1024*1024",
             if status == "SUCCEEDED":
                 break
             if status == "FAILED":
-                return {"success": False, "images": [],
-                        "error": result.get("output", {}).get("message", "未知错误")}
+                raise RuntimeError(result.get("output", {}).get("message", "未知错误"))
         else:
-            return {"success": False, "images": [], "error": f"生成超时 (task_id={task_id})"}
+            raise RuntimeError(f"生成超时 (task_id={task_id})")
 
-    # 3. 下载图片到本地
-    results = result["output"].get("results", [])
+    items = [("url", r["url"]) for r in result["output"].get("results", []) if r.get("url")]
+    if not items:
+        raise RuntimeError(f"任务成功但未返回图片 (task_id={task_id})")
+    return items, task_id[:8]
+
+
+async def _save_images(items: list[tuple[str, str]], dest_dir, stem: str) -> list[str]:
+    """把 ("url"|"b64", 内容) 列表保存为本地 PNG, 返回文件路径列表。"""
+    Path(dest_dir).mkdir(parents=True, exist_ok=True)
     saved_paths = []
-    import os as _os  # lazy import (we need it)
+    async with httpx.AsyncClient(timeout=60) as client:
+        for i, (kind, value) in enumerate(items):
+            if kind == "b64":
+                content = base64.b64decode(value)
+            else:
+                resp = await client.get(value)
+                resp.raise_for_status()
+                content = resp.content
+            # 通义万相默认返回 PNG
+            fpath = Path(dest_dir) / f"qwen_{stem}_{i}.png"
+            fpath.write_bytes(content)
+            saved_paths.append(str(fpath))
+    return saved_paths
+
+
+async def generate(prompt: str, size: str = "1024*1024",
+                   model: str = "wan2.1-t2i-turbo",
+                   api_key: str = "",
+                   n: int = 1,
+                   negative_prompt: str = "",
+                   output_dir: str = "") -> dict:
+    """
+    调用通义万相生成图像。
+
+    参数:
+      prompt:          正向提示词 (中文/英文均可，中文理解好)
+      size:            图像尺寸 "1024*1024" / "720*1280" / "1280*720"
+      model:           wanx2.1-t2i-turbo (默认)
+      api_key:         DashScope API Key
+      n:              生成数量 (1-4)
+      negative_prompt: 反向提示词 (可选)
+      output_dir:      图片保存目录 (可选)
+
+    返回:
+      {"success": bool, "images": [本地路径...], "error": str | None}
+
+    失败时抛出异常 (ValueError / RuntimeError / httpx 异常)。
+    """
+    if not api_key:
+        raise ValueError("缺少 DashScope API Key (设置 GENERATE_API_KEY 或 QWEN_DASHSCOPE_API_KEY)")
+
+    if model not in _GENERATE_MODELS:
+        raise ValueError(f"不支持的生成模型: {model}，可选: {_GENERATE_MODELS}")
+
+    if _use_openai_compat():
+        items, stem = await _generate_via_openai_compat(prompt, size, model, api_key, n, negative_prompt)
+    else:
+        items, stem = await _generate_via_dashscope(prompt, size, model, api_key, n, negative_prompt)
 
     dest_dir = output_dir or Path(__file__).parent.parent / "generated"
-    Path(dest_dir).mkdir(parents=True, exist_ok=True)
-
-    async with httpx.AsyncClient(timeout=60) as client:
-        for i, img_result in enumerate(results):
-            url = img_result.get("url")
-            if not url:
-                continue
-            resp = await client.get(url)
-            resp.raise_for_status()
-
-            ext = ".png"  # 通义万相默认返回 PNG
-            fname = f"qwen_{task_id[:8]}_{i}{ext}"
-            fpath = Path(dest_dir) / fname
-            fpath.write_bytes(resp.content)
-            saved_paths.append(str(fpath))
+    saved_paths = await _save_images(items, dest_dir, stem)
 
     return {
         "success": True,
