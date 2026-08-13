@@ -1,0 +1,41 @@
+# multimodal-bridge bundle layer for DeepSeek Harness profiles.
+#
+# One insert over the profile root; the row registers the `qwen_vision` and
+# `qwen_generate` tools through the package entry `dsh-multimodal-bridge`.
+# Users may override any field from their own profile `cordis.patch.yml`
+# (a patch replaces a row's WHOLE config, so restate fields you keep).
+#
+# A bundle is loaded by adding its package name to `dsh.profile.bundles`,
+# which `dsh plugin add dsh-multimodal-bridge` does automatically.
+- insert:
+    - id: multimodal-bridge
+      name: dsh-multimodal-bridge
+      config:
+        # Qwen (DashScope / 百炼) API key. Empty = fall back to
+        # QWEN_DASHSCOPE_API_KEY (or VISION_API_KEY / GENERATE_API_KEY)
+        # from the environment, so keys never have to live in this file.
+        apiKey: ''
+        # Empty = use the environment (QWEN_API_BASE), then the official
+        # DashScope endpoint. Gateway users set QWEN_API_BASE in ~/.dsh/.env,
+        # e.g. https://ws-xxxx.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+        # The client auto-detects the protocol from the URL. Pinning a URL
+        # here OVERRIDES the environment.
+        apiBase: ''
+        visionModel: qwen-vl-max
+        generateModel: qwen-image-2.0
+        # Models tried in order when the preferred one fails with a
+        # gateway-side routing error (a workspace gateway exposes only a
+        # subset of the models the key has quota for).
+        generateFallbackModels:
+          - wan2.7-image
+          - qwen-image-2.0
+          - wan2.7-image-pro
+          - wan2.1-t2i-turbo
+        # After a successful generation, register the PNGs as durable
+        # attachments and surface them in the tool-result card (UI-only
+        # display; image blocks never enter the model request). Best-effort;
+        # off by default.
+        attachGeneratedImages: false
+        # Directory for generated images; relative paths resolve against the
+        # session workspace (the invoking directory).
+        outputDir: generated

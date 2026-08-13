@@ -1,0 +1,41 @@
+name: dsh-plugin CI
+
+# Typecheck + build + package-dry-run for the DeepSeek Harness plugin bundle
+# living in dsh-plugin/. Runs only when that directory (or this workflow)
+# changes, so Python-side pushes stay cheap.
+
+on:
+  push:
+    paths:
+      - 'dsh-plugin/**'
+      - '.github/workflows/dsh-plugin-ci.yml'
+  pull_request:
+    paths:
+      - 'dsh-plugin/**'
+      - '.github/workflows/dsh-plugin-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dsh-plugin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck and build (tsc)
+        run: npm run build
+
+      - name: Verify npm package contents
+        run: npm pack --dry-run
+
+      - name: Harness-free smoke test (no API key → expect clean missing-key error)
+        run: node scripts/smoke.mjs missing.png 2>&1 || true

@@ -110,6 +110,19 @@ pip install -r requirements.txt
 | Vision (100张图) | ~$3-5 | ¥0 (百炼免费) | **100%** ↓ (前90天) |
 | 图像生成 (100张) | ~$4-8 (DALL·E) | ¥0 (百炼免费) | **100%** ↓ (前90天) |
 
+## DSH 插件（DeepSeek Harness）
+
+本仓库同时提供 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+的插件 bundle —— [`dsh-plugin/`](dsh-plugin/README.md)，注册
+`qwen_vision` / `qwen_generate` 两个模型工具，让纯文本模型在 Harness 内
+直接获得视觉与出图能力（与 MCP 工具同一套 Qwen 后端、同一份配置思路）。
+
+```sh
+dsh plugin --profile <name> add dsh-multimodal-bridge
+```
+
+用法、配置与发布指引见 [dsh-plugin/README.md](dsh-plugin/README.md)。
+
 ## 扩展
 
 适配器模式 — 在 `adapters/` 下新增 `.py`，实现 `vision()` / `generate()` 即可接入其他多模态后端：
