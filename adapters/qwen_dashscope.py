@@ -160,18 +160,21 @@ async def vision(image_path: str, prompt: str,
             "max_tokens": 4096,
         }
     else:
-        # DashScope 原生格式
+        # DashScope 原生格式 (必须包在 input.messages 里,
+        # 见 https://help.aliyun.com/en/model-studio/multimodal-http-protocol)
         body = {
             "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"image": data_uri},
-                        {"text": prompt},
-                    ],
-                }
-            ],
+            "input": {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"image": data_uri},
+                            {"text": prompt},
+                        ],
+                    }
+                ],
+            },
         }
 
     async with httpx.AsyncClient(timeout=120) as client:

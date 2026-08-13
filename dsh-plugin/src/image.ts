@@ -75,7 +75,9 @@ async function downscaleWithSharp(data: Buffer, maxEdge: number): Promise<Buffer
   } catch {
     throw new Error(
       `image exceeds the vision API limits (${MAX_IMAGE_BYTES} bytes / ${MAX_IMAGE_EDGE} px edge) `
-      + `and the optional "sharp" dependency is not installed, so it cannot be downscaled automatically`,
+      + 'and the optional "sharp" dependency is not installed, so it cannot be downscaled automatically. '
+      + 'Install it into the profile with: dsh plugin --profile <name> add sharp '
+      + '(then approve its build script via `pnpm approve-builds` in the profile directory)',
     )
   }
   const image = sharp(data).rotate() // normalize EXIF orientation

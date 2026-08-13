@@ -115,7 +115,9 @@ bundle patch 自带默认值；需要改默认值时在 profile 的 `cordis.patc
 ## 行为与限制
 
 - **大图自动降采样**：超过 ~10 MB 或最长边 1568 px 的图片会用 `sharp`
-  （optionalDependency）压成 JPEG；未装 `sharp` 时超限图片报错并提示安装。
+  压成 JPEG。`sharp` **不随包安装**（避免 pnpm 构建脚本审批拖垮默认安装）；
+  遇到超限图片且未装 sharp 时，报错会提示 `dsh plugin --profile <name> add sharp`
+  （装完在 profile 目录跑一次 `pnpm approve-builds` 审批其构建脚本）。
 - **两种 API 协议**：URL 含 `compatible-mode` 或以 `maas.aliyuncs.com` 结尾
   时走百炼 OpenAI 兼容格式（视觉与生成都挂 `chat/completions`），否则走
   DashScope 原生格式（生成是"提交任务 + 轮询"的异步流程，最长等 2 分钟）。
@@ -143,7 +145,10 @@ bundle patch 自带默认值；需要改默认值时在 profile 的 `cordis.patc
   - 百炼工作空间网关的 key（`sk-ws-...`）**只能**配 `https://ws-xxxx...maas.aliyuncs.com/compatible-mode/v1` 网关地址；
   - DashScope 官方 key（`sk-...`）配默认的 `https://dashscope.aliyuncs.com`。
   按 [配置与密钥安全](#配置与密钥安全) 的优先级检查实际生效的是哪一层的值（启动环境 > `~/.dsh/.credentials.yaml` > `~/.dsh/.env`），或到百炼控制台重新生成 key。
-- **大图报"sharp not installed"**：`npm install sharp`（可选依赖）或换一张 ≤10MB、长边 ≤1568px 的图。
+- **大图报"sharp not installed"**：按提示安装：
+  `dsh plugin --profile <name> add sharp`，然后在 profile 目录
+  （`$DSH_HOME/profiles/<name>`）执行 `pnpm approve-builds` 勾选 sharp 审批其
+  构建脚本；或换一张 ≤10MB、长边 ≤1568px 的图。
 - **`Qwen API error 400: ... url error, please check url!`**：百炼兼容网关下
   `qwen-image-2.0` 用 `1024*1024` 尺寸会触发这个误导性报错（网关内部路由问题）。
   用官方默认尺寸 `1328*1328`（插件对 qwen-image 模型族已自动采用），或换 `wan2.7-image`
@@ -156,6 +161,13 @@ bundle patch 自带默认值；需要改默认值时在 profile 的 `cordis.patc
   `~/.dsh/.env` 里的 `QWEN_API_BASE`。工作空间 key（`sk-ws-...`）必须走工作空间
   网关（同步通道）；走官方原生端点会因工作空间的结果存储链路问题在生成时报
   `url error`（视觉不受影响）。
+- **`dsh plugin add` 后版本停在旧版 / 报 `minimumReleaseAge` 相关错误**：
+  pnpm 11 起对"刚发布"的版本有约 24 小时的最小发布期保护（supply-chain 安全机制），
+  新版本发布后 `add` 可能自动回退旧版；显式 `@<新版本>` 也会在 lockfile 校验步
+  报 `MINIMUM_RELEASE_AGE_VIOLATION`。两个解法：① 等发布期窗口过去（约一天）；
+  ② 在该 profile 的 `pnpm-workspace.yaml`（`$DSH_HOME/profiles/<name>/`）里加
+  `minimumReleaseAge: 0` 关闭门槛后重试。若同时出现 `IGNORED_BUILDS`，
+  把同文件里 `allowBuilds` 的对应占位符改为 `true`（或跑 `pnpm approve-builds`）。
 - **`dsh --dump-config` 看不到本层**：确认 `dsh plugin add` 成功后 `dsh.profile.bundles` 里有 `dsh-multimodal-bridge`，且包名拼写一致。
 
 ## 开发
