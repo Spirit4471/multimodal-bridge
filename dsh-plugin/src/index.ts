@@ -2,6 +2,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { qwenVisionTool } from './vision-tool.js'
 import { qwenGenerateTool } from './generate-tool.js'
+import { qwenVideoTool } from './video-tool.js'
+import { qwenChatTool } from './chat-tool.js'
+import { qwenTtsTool } from './tts-tool.js'
 import { hasCredentialsProvider } from './credentials.js'
 
 /**
@@ -18,7 +21,7 @@ export const inject = ['tools']
 
 // Re-export the underlying client so tests / scripts can exercise the API
 // calls without booting the harness (`scripts/smoke.mjs` uses this).
-export { callVision, callGenerate, defaultSizeFor } from './client.js'
+export { callVision, callGenerate, callVideo, callChat, callTts, defaultSizeFor } from './client.js'
 
 export interface Config {
   /**
@@ -35,6 +38,8 @@ export interface Config {
   apiBase: string
   /** Vision model for `qwen_vision`. */
   visionModel: string
+  /** Vision models tried in order on model-level denials. */
+  visionFallbackModels: string[]
   /** Preferred text-to-image model for `qwen_generate`. */
   generateModel: string
   /**
@@ -43,6 +48,22 @@ export interface Config {
    * Each model uses its own official default size unless the caller chose one.
    */
   generateFallbackModels: string[]
+  /** Preferred text-to-video model for `qwen_video`. */
+  videoModel: string
+  /** Video models tried in order on model-level denials (not enabled, quota). */
+  videoFallbackModels: string[]
+  /** Preferred image-to-video model (used when qwen_video gets an image_path). */
+  videoI2vModel: string
+  /** I2V models tried in order on model-level denials. */
+  videoI2vFallbackModels: string[]
+  /** Preferred LLM for `qwen_chat` consultations (second opinion / rebuttal). */
+  chatModel: string
+  /** Chat models tried in order on model-level denials. */
+  chatFallbackModels: string[]
+  /** Preferred TTS model for `qwen_tts`. */
+  ttsModel: string
+  /** TTS models tried in order on model-level denials. */
+  ttsFallbackModels: string[]
   /**
    * After a successful generation, register the PNGs as durable attachments
    * and surface them in the tool-result card (UI-only display — image blocks
@@ -64,6 +85,11 @@ export const Config: Schema<Config> = Schema.object({
   // bundle patches leave it empty for gateway users.
   apiBase: Schema.string().default(''),
   visionModel: Schema.string().default('qwen-vl-max'),
+  visionFallbackModels: Schema.array(Schema.string()).default([
+    'qwen-vl-plus',
+    'qwen3-vl-plus',
+    'qwen3-vl-flash',
+  ]),
   generateModel: Schema.string().default('qwen-image-2.0'),
   generateFallbackModels: Schema.array(Schema.string()).default([
     'wan2.7-image',
@@ -71,6 +97,26 @@ export const Config: Schema<Config> = Schema.object({
     'wan2.7-image-pro',
     'wan2.1-t2i-turbo',
   ]),
+  videoModel: Schema.string().default('wanx2.1-t2v-turbo'),
+  videoFallbackModels: Schema.array(Schema.string()).default([
+    'wanx2.1-t2v-plus',
+    'wan2.6-t2v',
+    'wan2.7-t2v',
+  ]),
+  videoI2vModel: Schema.string().default('wanx2.1-i2v-turbo'),
+  videoI2vFallbackModels: Schema.array(Schema.string()).default([
+    'wanx2.1-i2v-plus',
+    'wan2.6-i2v',
+    'wan2.7-i2v',
+  ]),
+  chatModel: Schema.string().default('qwen3.7-max'),
+  chatFallbackModels: Schema.array(Schema.string()).default([
+    'qwen-max',
+    'glm-5.2',
+    'MiniMax-M2.5',
+  ]),
+  ttsModel: Schema.string().default('qwen-tts'),
+  ttsFallbackModels: Schema.array(Schema.string()).default([]),
   attachGeneratedImages: Schema.boolean().default(false),
   outputDir: Schema.string().default('generated'),
 })
@@ -80,14 +126,26 @@ export function apply(ctx: Context, config: Config) {
     apiKey: config.apiKey || '',
     apiBase: config.apiBase || process.env.QWEN_API_BASE || 'https://dashscope.aliyuncs.com',
     visionModel: config.visionModel,
+    visionFallbackModels: config.visionFallbackModels,
     generateModel: config.generateModel,
     generateFallbackModels: config.generateFallbackModels,
+    videoModel: config.videoModel,
+    videoFallbackModels: config.videoFallbackModels,
+    videoI2vModel: config.videoI2vModel,
+    videoI2vFallbackModels: config.videoI2vFallbackModels,
+    chatModel: config.chatModel,
+    chatFallbackModels: config.chatFallbackModels,
+    ttsModel: config.ttsModel,
+    ttsFallbackModels: config.ttsFallbackModels,
     attachGeneratedImages: config.attachGeneratedImages,
     outputDir: config.outputDir || 'generated',
   }
 
   ctx.tools.register(qwenVisionTool(ctx, options))
   ctx.tools.register(qwenGenerateTool(ctx, options))
+  ctx.tools.register(qwenVideoTool(ctx, options))
+  ctx.tools.register(qwenChatTool(ctx, options))
+  ctx.tools.register(qwenTtsTool(ctx, options))
 
   if (!config.apiKey
     && !process.env.QWEN_DASHSCOPE_API_KEY

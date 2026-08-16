@@ -21,12 +21,33 @@
         # official DashScope endpoint. Pin a URL here only to override env.
         apiBase: ''
         visionModel: qwen-vl-max
+        visionFallbackModels:
+          - qwen-vl-plus
+          - qwen3-vl-plus
+          - qwen3-vl-flash
         generateModel: qwen-image-2.0
         generateFallbackModels:
           - wan2.7-image
           - qwen-image-2.0
           - wan2.7-image-pro
           - wan2.1-t2i-turbo
+        videoModel: wanx2.1-t2v-turbo
+        videoFallbackModels:
+          - wanx2.1-t2v-plus
+          - wan2.6-t2v
+          - wan2.7-t2v
+        videoI2vModel: wanx2.1-i2v-turbo
+        videoI2vFallbackModels:
+          - wanx2.1-i2v-plus
+          - wan2.6-i2v
+          - wan2.7-i2v
+        chatModel: qwen3.7-max
+        chatFallbackModels:
+          - qwen-max
+          - glm-5.2
+          - MiniMax-M2.5
+        ttsModel: qwen-tts
+        ttsFallbackModels: []
         # Register generated images as durable attachments and surface them
         # in the tool-result card (UI-only display; never enters the model
         # request, which text-only adapters would reject).

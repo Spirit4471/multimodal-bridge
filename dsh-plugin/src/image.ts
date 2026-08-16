@@ -112,3 +112,36 @@ export async function imageToDataUri(imagePath: string): Promise<string> {
   const outMime = oversized ? 'image/jpeg' : mime
   return `data:${outMime};base64,${data.toString('base64')}`
 }
+
+/**
+ * Encode an input image for image-EDITING requests. The 百炼 image chat path
+ * enforces a much smaller content length than the vision endpoint, so editing
+ * inputs are downscaled to 1024px and JPEG-encoded whenever sharp is
+ * available; without sharp the standard (limits-checked) encoding is used.
+ */
+export async function imageToEditDataUri(imagePath: string): Promise<string> {
+  const original = await readFile(imagePath)
+  let sharp: typeof import('sharp')
+  try {
+    sharp = (await import('sharp')).default
+  } catch {
+    // No sharp: best effort with the original encoding.
+    return imageToDataUri(imagePath)
+  }
+  const image = sharp(original).rotate() // normalize EXIF orientation
+  const metadata = await image.metadata()
+  const width = metadata.width
+  const height = metadata.height
+  const edge = width !== undefined && height !== undefined ? Math.max(width, height) : 0
+  if (edge > 1024) {
+    image.resize({
+      width: 1024,
+      height: 1024,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+  }
+  // JPEG flattens transparency; composite onto white to avoid black artifacts.
+  const data = await image.flatten({ background: '#ffffff' }).jpeg({ quality: 80 }).toBuffer()
+  return `data:image/jpeg;base64,${data.toString('base64')}`
+}

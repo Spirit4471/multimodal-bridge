@@ -22,6 +22,10 @@
         # here OVERRIDES the environment.
         apiBase: ''
         visionModel: qwen-vl-max
+        visionFallbackModels:
+          - qwen-vl-plus
+          - qwen3-vl-plus
+          - qwen3-vl-flash
         generateModel: qwen-image-2.0
         # Models tried in order when the preferred one fails with a
         # gateway-side routing error (a workspace gateway exposes only a
@@ -31,6 +35,29 @@
           - qwen-image-2.0
           - wan2.7-image-pro
           - wan2.1-t2i-turbo
+        # Text-to-video models (native DashScope async video-synthesis).
+        # Try them in order; models the key cannot use (AccessDenied /
+        # not exist / quota) are skipped automatically.
+        videoModel: wanx2.1-t2v-turbo
+        videoFallbackModels:
+          - wanx2.1-t2v-plus
+          - wan2.6-t2v
+          - wan2.7-t2v
+        # Image-to-video models (used when qwen_video receives image_path).
+        videoI2vModel: wanx2.1-i2v-turbo
+        videoI2vFallbackModels:
+          - wanx2.1-i2v-plus
+          - wan2.6-i2v
+          - wan2.7-i2v
+        # LLM consultation (second opinion / rebuttal / verification).
+        chatModel: qwen3.7-max
+        chatFallbackModels:
+          - qwen-max
+          - glm-5.2
+          - MiniMax-M2.5
+        # Text-to-speech (verified via qwen-tts with input.text, WAV output).
+        ttsModel: qwen-tts
+        ttsFallbackModels: []
         # After a successful generation, register the PNGs as durable
         # attachments and surface them in the tool-result card (UI-only
         # display; image blocks never enter the model request). Best-effort;

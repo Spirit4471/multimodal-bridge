@@ -28,13 +28,18 @@ export function qwenGenerateTool(ctx: Context, options: QwenOptions) {
   return defineTool({
     name: 'qwen_generate',
     description:
-      'Generate an image with a Qwen-Image text-to-image model. Saves the result as PNG files and '
-      + 'returns their absolute paths. Chinese and English prompts both work well.',
+      'Generate an image with a Qwen-Image model (text-to-image), or edit/transform a local image '
+      + '(image-to-image) by passing image_path plus a text instruction. Saves the result as PNG '
+      + 'files and returns their absolute paths. Chinese and English prompts both work well.',
     parameters: {
       prompt: {
         type: 'string',
         required: true,
-        description: 'Image description (Chinese works well).',
+        description: 'Image description, or the edit instruction when image_path is given (e.g. "turn it into a cartoon style").',
+      },
+      image_path: {
+        type: 'string',
+        description: 'Optional local image to edit (image-to-image). Supported on OpenAI-compatible gateways only.',
       },
       size: {
         type: 'string',
@@ -143,6 +148,7 @@ export function qwenGenerateTool(ctx: Context, options: QwenOptions) {
             apiKey,
             apiBase: options.apiBase,
             outputDir: options.outputDir,
+            imagePath: args.image_path,
             signal: exec.signal,
           })
           let attachments: ImageAttachmentRefLike[] = []

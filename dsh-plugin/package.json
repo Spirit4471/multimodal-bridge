@@ -1,7 +1,7 @@
 {
   "name": "dsh-multimodal-bridge",
-  "version": "0.1.1",
-  "description": "DeepSeek Harness plugin bundle: qwen_vision (Qwen-VL image understanding) and qwen_generate (Qwen-Image text-to-image) tools for text-only models",
+  "version": "0.1.2",
+  "description": "DeepSeek Harness plugin bundle: qwen_vision (Qwen-VL image understanding) and qwen_generate (Qwen-Image text-to-image and image editing) tools for text-only models",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
